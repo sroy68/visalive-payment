@@ -29,21 +29,41 @@ app.post('/create-order', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// পেমেন্ট যাচাই
 app.post('/verify-payment', (req, res) => {
-  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-  const shasum = crypto.createHmac('sha256', KEY_SECRET);
-  shasum.update(razorpay_order_id + '|' + razorpay_payment_id);
-  const signature = shasum.digest('hex');
+  try {
+    const crypto = require('crypto');
+    const { razorpay_order_id, razorpay_payment_id } = req.body;
+    
+    // ✅ HEADER থেকে signature নিন
+    const razorpay_signature = req.headers['x-razorpay-signature'];
+    
+    // ✅ Environment variable ব্যবহার করুন
+    const KEY_SECRET = process.env.RAZORPAY_KEY_SECRET;
+    
+    const shasum = crypto.createHmac('sha256', KEY_SECRET);
+    shasum.update(razorpay_order_id + '|' + razorpay_payment_id);
+    const signature = shasum.digest('hex');
 
-  if (signature === razorpay_signature) {
-    res.json({ success: true, payment_id: razorpay_payment_id });
-  } else {
-    res.status(400).json({ success: false, error: 'Invalid signature' });
+    console.log('Expected:', signature);
+    console.log('Received:', razorpay_signature);
+
+    if (signature === razorpay_signature) {
+      res.json({ 
+        success: true, 
+        payment_id: razorpay_payment_id,
+        message: 'Payment verified ✅'
+      });
+    } else {
+      res.status(400).json({ 
+        success: false, 
+        error: 'Invalid signature ❌' 
+      });
+    }
+  } catch (error) {
+    console.error('Verify error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
-
 // টেস্ট পেজ
 app.get('/', (req, res) => {
   res.send(`
